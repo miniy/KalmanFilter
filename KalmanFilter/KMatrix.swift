@@ -9,7 +9,7 @@
 import Foundation
 import Accelerate
 
-public struct Matrix: Equatable {
+public struct KMatrix: Equatable {
     // MARK: - Properties
     public let rows: Int, columns: Int
     public var grid: [Double]
@@ -132,20 +132,20 @@ public struct Matrix: Equatable {
 
 // MARK: - Equatable
 
-public func == (lhs: Matrix, rhs: Matrix) -> Bool {
+public func == (lhs: KMatrix, rhs: KMatrix) -> Bool {
     return lhs.rows == rhs.rows && lhs.columns == rhs.columns && lhs.grid == rhs.grid
 }
 
 // MARK: -  Matrix as KalmanInput
-extension Matrix: KalmanInput {
+extension KMatrix: KalmanInput {
     /**
      [Transposed](https://en.wikipedia.org/wiki/Transpose)
      version of matrix
      
      Compexity: O(n^2)
      */
-    public var transposed: Matrix {
-        var resultMatrix = Matrix(rows: columns, columns: rows)
+    public var transposed: KMatrix {
+        var resultMatrix = KMatrix(rows: columns, columns: rows)
         let columnLength = resultMatrix.columns
         let rowLength = resultMatrix.rows
         grid.withUnsafeBufferPointer { xp in
@@ -166,20 +166,20 @@ extension Matrix: KalmanInput {
      
      Complexity: O(n ^ 2)
      */
-    public var additionToUnit: Matrix {
+    public var additionToUnit: KMatrix {
         assert(isSquare, "Matrix should be square")
-        return Matrix(identityOfSize: rows) - self
+        return KMatrix(identityOfSize: rows) - self
     }
     
     /**
      Inversed matrix if
      [it is invertible](https://en.wikipedia.org/wiki/Invertible_matrix)
      */
-    public var inversed: Matrix {
+    public var inversed: KMatrix {
         assert(isSquare, "Matrix should be square")
         
         if rows == 1 {
-            return Matrix(grid: [1/self[0, 0]], rows: 1, columns: 1)
+            return KMatrix(grid: [1/self[0, 0]], rows: 1, columns: 1)
         }
         
         var inMatrix:[Double] = grid
@@ -202,7 +202,7 @@ extension Matrix: KalmanInput {
         if error != 0 {
             assertionFailure("Matrix Inversion Failure")
         }
-        return Matrix.init(grid: inMatrix, rows: rows, columns: rows)
+        return KMatrix.init(grid: inMatrix, rows: rows, columns: rows)
     }
     
     /**
@@ -222,9 +222,9 @@ extension Matrix: KalmanInput {
         return result
     }
     
-    public func additionalMatrix(row: Int, column: Int) -> Matrix {
+    public func additionalMatrix(row: Int, column: Int) -> KMatrix {
         assert(indexIsValid(forRow: row, column: column), "Invalid arguments")
-        var resultMatrix = Matrix(rows: rows - 1, columns: columns - 1)
+        var resultMatrix = KMatrix(rows: rows - 1, columns: columns - 1)
         for i in 0..<rows {
             if i == row {
                 continue
@@ -242,9 +242,9 @@ extension Matrix: KalmanInput {
     }
     
     // MARK: - Private methods
-    fileprivate func operate(with otherMatrix: Matrix, closure: (Double, Double) -> Double) -> Matrix {
+    fileprivate func operate(with otherMatrix: KMatrix, closure: (Double, Double) -> Double) -> KMatrix {
         assert(rows == otherMatrix.rows && columns == otherMatrix.columns, "Matrices should be of equal size")
-        var resultMatrix = Matrix(rows: rows, columns: columns)
+        var resultMatrix = KMatrix(rows: rows, columns: columns)
         
         for i in 0..<rows {
             for j in 0..<columns {
@@ -261,9 +261,9 @@ extension Matrix: KalmanInput {
  
  Complexity: O(n^2)
  */
-public func + (lhs: Matrix, rhs: Matrix) -> Matrix {
+public func + (lhs: KMatrix, rhs: KMatrix) -> KMatrix {
     assert(lhs.rows == rhs.rows && lhs.columns == rhs.columns, "Matrices should be of equal size")
-    var resultMatrix = Matrix(rows: lhs.rows, columns: lhs.columns)
+    var resultMatrix = KMatrix(rows: lhs.rows, columns: lhs.columns)
     vDSP_vaddD(lhs.grid, vDSP_Stride(1), rhs.grid, vDSP_Stride(1), &resultMatrix.grid, vDSP_Stride(1), vDSP_Length(lhs.rows * lhs.columns))
     return resultMatrix
 }
@@ -273,9 +273,9 @@ public func + (lhs: Matrix, rhs: Matrix) -> Matrix {
  
  Complexity: O(n^2)
  */
-public func - (lhs: Matrix, rhs: Matrix) -> Matrix {
+public func - (lhs: KMatrix, rhs: KMatrix) -> KMatrix {
     assert(lhs.rows == rhs.rows && lhs.columns == rhs.columns, "Matrices should be of equal size")
-    var resultMatrix = Matrix(rows: lhs.rows, columns: lhs.columns)
+    var resultMatrix = KMatrix(rows: lhs.rows, columns: lhs.columns)
     vDSP_vsubD(rhs.grid, vDSP_Stride(1), lhs.grid, vDSP_Stride(1), &resultMatrix.grid, vDSP_Stride(1), vDSP_Length(lhs.rows * lhs.columns))
     return resultMatrix
 }
@@ -286,9 +286,9 @@ public func - (lhs: Matrix, rhs: Matrix) -> Matrix {
  
  Complexity: O(n^3)
  */
-public func * (lhs: Matrix, rhs: Matrix) -> Matrix {
+public func * (lhs: KMatrix, rhs: KMatrix) -> KMatrix {
     assert(lhs.columns == rhs.rows, "Left matrix columns should be the size of right matrix's rows")
-    var resultMatrix = Matrix(rows: lhs.rows, columns: rhs.columns)
+    var resultMatrix = KMatrix(rows: lhs.rows, columns: rhs.columns)
     let order = CblasRowMajor
     let atrans = CblasNoTrans
     let btrans = CblasNoTrans
@@ -307,16 +307,16 @@ public func * (lhs: Matrix, rhs: Matrix) -> Matrix {
 }
 
 // MARK: - Nice additional methods
-public func * (lhs: Matrix, rhs: Double) -> Matrix {
-    return Matrix(grid: lhs.grid.map({ $0*rhs }), rows: lhs.rows, columns: lhs.columns)
+public func * (lhs: KMatrix, rhs: Double) -> KMatrix {
+    return KMatrix(grid: lhs.grid.map({ $0*rhs }), rows: lhs.rows, columns: lhs.columns)
 }
 
-public func * (lhs: Double, rhs: Matrix) -> Matrix {
+public func * (lhs: Double, rhs: KMatrix) -> KMatrix {
     return rhs * lhs
 }
 
 // MARK: - CustomStringConvertible for debug output
-extension Matrix: CustomStringConvertible {
+extension KMatrix: CustomStringConvertible {
     public var description: String {
         var description = ""
         
